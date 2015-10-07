@@ -627,8 +627,18 @@ ERL_NIF_TERM enif_crypto_secretbox_NONCEBYTES(ErlNifEnv *env, int argc, ERL_NIF_
 }
 
 static
+ERL_NIF_TERM enif_crypto_secretbox_xsalsa20poly1305_NONCEBYTES(ErlNifEnv *env, int argc, ERL_NIF_TERM const argv[]) {
+	return enif_make_int64(env, crypto_secretbox_xsalsa20poly1305_NONCEBYTES);
+}
+
+static
 ERL_NIF_TERM enif_crypto_secretbox_KEYBYTES(ErlNifEnv *env, int argc, ERL_NIF_TERM const argv[]) {
 	return enif_make_int64(env, crypto_secretbox_KEYBYTES);
+}
+
+static
+ERL_NIF_TERM enif_crypto_secretbox_xsalsa20poly1305_KEYBYTES(ErlNifEnv *env, int argc, ERL_NIF_TERM const argv[]) {
+	return enif_make_int64(env, crypto_secretbox_xsalsa20poly1305_KEYBYTES);
 }
 
 static
@@ -637,8 +647,18 @@ ERL_NIF_TERM enif_crypto_secretbox_ZEROBYTES(ErlNifEnv *env, int argc, ERL_NIF_T
 }
 
 static
+ERL_NIF_TERM enif_crypto_secretbox_xsalsa20poly1305_ZEROBYTES(ErlNifEnv *env, int argc, ERL_NIF_TERM const argv[]) {
+	return enif_make_int64(env, crypto_secretbox_xsalsa20poly1305_ZEROBYTES);
+}
+
+static
 ERL_NIF_TERM enif_crypto_secretbox_BOXZEROBYTES(ErlNifEnv *env, int argc, ERL_NIF_TERM const argv[]) {
 	return enif_make_int64(env, crypto_secretbox_BOXZEROBYTES);
+}
+
+static
+ERL_NIF_TERM enif_crypto_secretbox_xsalsa20poly1305_BOXZEROBYTES(ErlNifEnv *env, int argc, ERL_NIF_TERM const argv[]) {
+	return enif_make_int64(env, crypto_secretbox_xsalsa20poly1305_BOXZEROBYTES);
 }
 
 static
@@ -657,8 +677,18 @@ ERL_NIF_TERM enif_crypto_auth_BYTES(ErlNifEnv *env, int argc, ERL_NIF_TERM const
 }
 
 static
+ERL_NIF_TERM enif_crypto_auth_hmacsha256_BYTES(ErlNifEnv *env, int argc, ERL_NIF_TERM const argv[]) {
+	return enif_make_int64(env, crypto_auth_hmacsha256_BYTES);
+}
+
+static
 ERL_NIF_TERM enif_crypto_auth_KEYBYTES(ErlNifEnv *env, int argc, ERL_NIF_TERM const argv[]) {
 	return enif_make_int64(env, crypto_auth_KEYBYTES);
+}
+
+static
+ERL_NIF_TERM enif_crypto_auth_hmacsha256_KEYBYTES(ErlNifEnv *env, int argc, ERL_NIF_TERM const argv[]) {
+	return enif_make_int64(env, crypto_auth_hmacsha256_KEYBYTES);
 }
 
 static
@@ -707,6 +737,41 @@ ERL_NIF_TERM enif_crypto_secretbox(ErlNifEnv *env, int argc, ERL_NIF_TERM const 
 }
 
 static
+ERL_NIF_TERM enif_crypto_secretbox_xsalsa20poly1305(ErlNifEnv *env, int argc, ERL_NIF_TERM const argv[]) {
+	ErlNifBinary key, nonce, padded_msg, padded_ciphertext;
+
+	if (
+	  (argc != 3) ||
+	  (!enif_inspect_iolist_as_binary(env, argv[0], &padded_msg)) ||
+	  (!enif_inspect_binary(env, argv[1], &nonce)) ||
+	  (!enif_inspect_binary(env, argv[2], &key))) {
+		return enif_make_badarg(env);
+	}
+
+	if (
+	  (key.size != crypto_secretbox_xsalsa20poly1305_KEYBYTES) ||
+	  (nonce.size != crypto_secretbox_xsalsa20poly1305_NONCEBYTES) ||
+	  (padded_msg.size < crypto_secretbox_xsalsa20poly1305_ZEROBYTES)) {
+		return enif_make_badarg(env);
+	}
+
+	if (!enif_alloc_binary(padded_msg.size, &padded_ciphertext)) {
+		return nacl_error_tuple(env, "alloc_failed");
+	}
+
+	crypto_secretbox_xsalsa20poly1305(
+	  padded_ciphertext.data,
+	  padded_msg.data, padded_msg.size,
+	  nonce.data,
+	  key.data);
+
+	return enif_make_sub_binary(env,
+		enif_make_binary(env, &padded_ciphertext),
+		crypto_secretbox_xsalsa20poly1305_BOXZEROBYTES,
+		padded_msg.size - crypto_secretbox_xsalsa20poly1305_BOXZEROBYTES);
+}
+
+static
 ERL_NIF_TERM enif_crypto_secretbox_open(ErlNifEnv *env, int argc, ERL_NIF_TERM const argv[]) {
 	ErlNifBinary key, nonce, padded_ciphertext, padded_msg;
 
@@ -744,6 +809,46 @@ ERL_NIF_TERM enif_crypto_secretbox_open(ErlNifEnv *env, int argc, ERL_NIF_TERM c
 	    enif_make_binary(env, &padded_msg),
 	    crypto_secretbox_ZEROBYTES,
 	    padded_ciphertext.size - crypto_secretbox_ZEROBYTES);
+}
+
+static
+ERL_NIF_TERM enif_crypto_secretbox_xsalsa20poly1305_open(ErlNifEnv *env, int argc, ERL_NIF_TERM const argv[]) {
+	ErlNifBinary key, nonce, padded_ciphertext, padded_msg;
+
+	if (
+	  (argc != 3) ||
+	  (!enif_inspect_iolist_as_binary(env, argv[0], &padded_ciphertext)) ||
+	  (!enif_inspect_binary(env, argv[1], &nonce)) ||
+	  (!enif_inspect_binary(env, argv[2], &key))) {
+		return enif_make_badarg(env);
+	}
+
+	if (
+	  (key.size != crypto_secretbox_xsalsa20poly1305_KEYBYTES) ||
+	  (nonce.size != crypto_secretbox_xsalsa20poly1305_NONCEBYTES) ||
+	  (padded_ciphertext.size < crypto_secretbox_xsalsa20poly1305_BOXZEROBYTES)) {
+		return enif_make_badarg(env);
+	}
+
+	if (!enif_alloc_binary(padded_ciphertext.size, &padded_msg)) {
+		return nacl_error_tuple(env, "alloc_failed");
+	}
+
+	if (crypto_secretbox_xsalsa20poly1305_open(
+	    padded_msg.data,
+	    padded_ciphertext.data,
+	    padded_ciphertext.size,
+	    nonce.data,
+	    key.data) != 0) {
+		enif_release_binary(&padded_msg);
+		return nacl_error_tuple(env, "failed_verification");
+	}
+
+	return enif_make_sub_binary(
+	    env,
+	    enif_make_binary(env, &padded_msg),
+	    crypto_secretbox_xsalsa20poly1305_ZEROBYTES,
+	    padded_ciphertext.size - crypto_secretbox_xsalsa20poly1305_ZEROBYTES);
 }
 
 static
@@ -826,6 +931,30 @@ ERL_NIF_TERM enif_crypto_auth(ErlNifEnv *env, int argc, ERL_NIF_TERM const argv[
 }
 
 static
+ERL_NIF_TERM enif_crypto_auth_hmacsha256(ErlNifEnv *env, int argc, ERL_NIF_TERM const argv[]) {
+	ErlNifBinary a,m,k;
+
+	if (
+	  (argc != 2) ||
+	  (!enif_inspect_iolist_as_binary(env, argv[0], &m)) ||
+	  (!enif_inspect_binary(env, argv[1], &k))) {
+		return enif_make_badarg(env);
+	}
+
+	if (k.size != crypto_auth_hmacsha256_KEYBYTES) {
+		return enif_make_badarg(env);
+	}
+
+	if (!enif_alloc_binary(crypto_auth_hmacsha256_BYTES, &a)) {
+		return nacl_error_tuple(env, "alloc_failed");
+	}
+
+	crypto_auth_hmacsha256(a.data, m.data, m.size, k.data);
+
+	return enif_make_binary(env, &a);
+}
+
+static
 ERL_NIF_TERM enif_crypto_auth_verify(ErlNifEnv *env, int argc, ERL_NIF_TERM const argv[]) {
 	ErlNifBinary a, m, k;
 
@@ -844,6 +973,31 @@ ERL_NIF_TERM enif_crypto_auth_verify(ErlNifEnv *env, int argc, ERL_NIF_TERM cons
 	}
 
 	if (0 == crypto_auth_verify(a.data, m.data, m.size, k.data)) {
+		return enif_make_atom(env, "true");
+	} else {
+		return enif_make_atom(env, "false");
+	}
+}
+
+static
+ERL_NIF_TERM enif_crypto_auth_hmacsha256_verify(ErlNifEnv *env, int argc, ERL_NIF_TERM const argv[]) {
+	ErlNifBinary a, m, k;
+
+	if (
+	  (argc != 3) ||
+	  (!enif_inspect_binary(env, argv[0], &a)) ||
+	  (!enif_inspect_iolist_as_binary(env, argv[1], &m)) ||
+	  (!enif_inspect_binary(env, argv[2], &k))) {
+		return enif_make_badarg(env);
+	}
+
+	if (
+	  (k.size != crypto_auth_hmacsha256_KEYBYTES) ||
+	  (a.size != crypto_auth_hmacsha256_BYTES)) {
+		return enif_make_badarg(env);
+	}
+
+	if (0 == crypto_auth_hmacsha256_verify(a.data, m.data, m.size, k.data)) {
 		return enif_make_atom(env, "true");
 	} else {
 		return enif_make_atom(env, "false");
@@ -1036,6 +1190,15 @@ static ErlNifFunc nif_funcs[] = {
 	{"crypto_secretbox", 3, enif_crypto_secretbox, ERL_NIF_DIRTY_JOB_CPU_BOUND},
 	{"crypto_secretbox_open_b", 3, enif_crypto_secretbox_open},
 	{"crypto_secretbox_open", 3, enif_crypto_secretbox_open, ERL_NIF_DIRTY_JOB_CPU_BOUND},
+	
+	{"crypto_secretbox_xsalsa20poly1305_NONCEBYTES", 0, enif_crypto_secretbox_xsalsa20poly1305_NONCEBYTES},
+	{"crypto_secretbox_xsalsa20poly1305_ZEROBYTES", 0, enif_crypto_secretbox_xsalsa20poly1305_ZEROBYTES},
+	{"crypto_secretbox_xsalsa20poly1305_BOXZEROBYTES", 0, enif_crypto_secretbox_xsalsa20poly1305_BOXZEROBYTES},
+	{"crypto_secretbox_xsalsa20poly1305_KEYBYTES", 0, enif_crypto_secretbox_xsalsa20poly1305_KEYBYTES},
+	{"crypto_secretbox_xsalsa20poly1305_b", 3, enif_crypto_secretbox_xsalsa20poly1305},
+	{"crypto_secretbox_xsalsa20poly1305", 3, enif_crypto_secretbox_xsalsa20poly1305, ERL_NIF_DIRTY_JOB_CPU_BOUND},
+	{"crypto_secretbox_xsalsa20poly1305_open_b", 3, enif_crypto_secretbox_xsalsa20poly1305_open},
+	{"crypto_secretbox_xsalsa20poly1305_open", 3, enif_crypto_secretbox_xsalsa20poly1305_open, ERL_NIF_DIRTY_JOB_CPU_BOUND},
 
 	{"crypto_stream_KEYBYTES", 0, enif_crypto_stream_KEYBYTES},
 	{"crypto_stream_NONCEBYTES", 0, enif_crypto_stream_NONCEBYTES},
@@ -1050,6 +1213,13 @@ static ErlNifFunc nif_funcs[] = {
 	{"crypto_auth", 2, enif_crypto_auth, ERL_NIF_DIRTY_JOB_CPU_BOUND},
 	{"crypto_auth_verify_b", 3, enif_crypto_auth_verify},
 	{"crypto_auth_verify", 3, enif_crypto_auth_verify, ERL_NIF_DIRTY_JOB_CPU_BOUND},
+	
+	{"crypto_auth_hmacsha256_BYTES", 0, enif_crypto_auth_hmacsha256_BYTES},
+	{"crypto_auth_hmacsha256_KEYBYTES", 0, enif_crypto_auth_hmacsha256_KEYBYTES},
+	{"crypto_auth_hmacsha256_b", 2, enif_crypto_auth_hmacsha256},
+	{"crypto_auth_hmacsha256", 2, enif_crypto_auth_hmacsha256, ERL_NIF_DIRTY_JOB_CPU_BOUND},
+	{"crypto_auth_hmacsha256_verify_b", 3, enif_crypto_auth_hmacsha256_verify},
+	{"crypto_auth_hmacsha256_verify", 3, enif_crypto_auth_hmacsha256_verify, ERL_NIF_DIRTY_JOB_CPU_BOUND},
 
 	{"crypto_onetimeauth_BYTES", 0, enif_crypto_onetimeauth_BYTES},
 	{"crypto_onetimeauth_KEYBYTES", 0, enif_crypto_onetimeauth_KEYBYTES},

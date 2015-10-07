@@ -47,10 +47,20 @@
 	crypto_secretbox_NONCEBYTES/0,
 	crypto_secretbox_ZEROBYTES/0,
 
+	crypto_secretbox_xsalsa20poly1305_BOXZEROBYTES/0,
+	crypto_secretbox_xsalsa20poly1305_KEYBYTES/0,
+	crypto_secretbox_xsalsa20poly1305_NONCEBYTES/0,
+	crypto_secretbox_xsalsa20poly1305_ZEROBYTES/0,
+
 	crypto_secretbox/3,
 	crypto_secretbox_b/3,
 	crypto_secretbox_open/3,
 	crypto_secretbox_open_b/3,
+
+	crypto_secretbox_xsalsa20poly1305/3,
+	crypto_secretbox_xsalsa20poly1305_b/3,
+	crypto_secretbox_xsalsa20poly1305_open/3,
+	crypto_secretbox_xsalsa20poly1305_open_b/3,
 
 	crypto_stream_KEYBYTES/0,
 	crypto_stream_NONCEBYTES/0,
@@ -63,10 +73,18 @@
 	crypto_auth_BYTES/0,
 	crypto_auth_KEYBYTES/0,
 
+	crypto_auth_hmacsha256_BYTES/0,
+	crypto_auth_hmacsha256_KEYBYTES/0,
+
 	crypto_auth/2,
 	crypto_auth_b/2,
 	crypto_auth_verify/3,
 	crypto_auth_verify_b/3,
+
+	crypto_auth_hmacsha256/2,
+	crypto_auth_hmacsha256_b/2,
+	crypto_auth_hmacsha256_verify/3,
+	crypto_auth_hmacsha256_verify_b/3,
 
 	crypto_onetimeauth_BYTES/0,
 	crypto_onetimeauth_KEYBYTES/0,
@@ -158,10 +176,20 @@ crypto_secretbox_ZEROBYTES() -> erlang:nif_error(nif_not_loaded).
 crypto_secretbox_KEYBYTES() -> erlang:nif_error(nif_not_loaded).
 crypto_secretbox_BOXZEROBYTES() -> erlang:nif_error(nif_not_loaded).
 
+crypto_secretbox_xsalsa20poly1305_NONCEBYTES() -> erlang:nif_error(nif_not_loaded).
+crypto_secretbox_xsalsa20poly1305_ZEROBYTES() -> erlang:nif_error(nif_not_loaded).
+crypto_secretbox_xsalsa20poly1305_KEYBYTES() -> erlang:nif_error(nif_not_loaded).
+crypto_secretbox_xsalsa20poly1305_BOXZEROBYTES() -> erlang:nif_error(nif_not_loaded).
+
 crypto_secretbox(_Msg, _Nonce, _Key) -> erlang:nif_error(nif_not_loaded).
 crypto_secretbox_b(_Msg, _Nonce, _Key) -> erlang:nif_error(nif_not_loaded).
 crypto_secretbox_open(_Msg, _Nonce, _Key) -> erlang:nif_error(nif_not_loaded).
 crypto_secretbox_open_b(_Msg, _Nonce, _Key) -> erlang:nif_error(nif_not_loaded).
+
+crypto_secretbox_xsalsa20poly1305(_Msg, _Nonce, _Key) -> erlang:nif_error(nif_not_loaded).
+crypto_secretbox_xsalsa20poly1305_b(_Msg, _Nonce, _Key) -> erlang:nif_error(nif_not_loaded).
+crypto_secretbox_xsalsa20poly1305_open(_Msg, _Nonce, _Key) -> erlang:nif_error(nif_not_loaded).
+crypto_secretbox_xsalsa20poly1305_open_b(_Msg, _Nonce, _Key) -> erlang:nif_error(nif_not_loaded).
 
 crypto_stream_KEYBYTES() -> erlang:nif_error(nif_not_loaded).
 crypto_stream_NONCEBYTES() -> erlang:nif_error(nif_not_loaded).
@@ -176,6 +204,13 @@ crypto_auth(_Msg, _Key) -> erlang:nif_error(nif_not_loaded).
 crypto_auth_b(_Msg, _Key) -> erlang:nif_error(nif_not_loaded).
 crypto_auth_verify(_Authenticator, _Msg, _Key) -> erlang:nif_error(nif_not_loaded).
 crypto_auth_verify_b(_Authenticator, _Msg, _Key) -> erlang:nif_error(nif_not_loaded).
+
+crypto_auth_hmacsha256_BYTES() -> erlang:nif_error(nif_not_loaded).
+crypto_auth_hmacsha256_KEYBYTES() -> erlang:nif_error(nif_not_loaded).
+crypto_auth_hmacsha256(_Msg, _Key) -> erlang:nif_error(nif_not_loaded).
+crypto_auth_hmacsha256_b(_Msg, _Key) -> erlang:nif_error(nif_not_loaded).
+crypto_auth_hmacsha256_verify(_Authenticator, _Msg, _Key) -> erlang:nif_error(nif_not_loaded).
+crypto_auth_hmacsha256_verify_b(_Authenticator, _Msg, _Key) -> erlang:nif_error(nif_not_loaded).
 
 crypto_onetimeauth_BYTES() -> erlang:nif_error(nif_not_loaded).
 crypto_onetimeauth_KEYBYTES() -> erlang:nif_error(nif_not_loaded).

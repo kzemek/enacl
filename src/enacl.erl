@@ -44,6 +44,11 @@
 
 %% Secret key crypto
 -export([
+    secretbox_key_size/1,
+    secretbox_nonce_size/1,
+    secretbox/4,
+    secretbox_open/4,
+
 	secretbox_key_size/0,
 	secretbox_nonce_size/0,
 	secretbox/3,
@@ -53,6 +58,11 @@
 	stream_nonce_size/0,
 	stream/3,
 	stream_xor/3,
+
+    auth_key_size/1,
+    auth_size/1,
+    auth/3,
+    auth_verify/4,
 
 	auth_key_size/0,
 	auth_size/0,
@@ -434,6 +444,24 @@ box_seal_open(SealedCipherText, PK, SK) ->
         Bin when is_binary(Bin) -> {ok, Bin}
     end.
 
+-spec secretbox(xsalsa20poly1305, Msg, Nonce, Key) -> Box
+    when
+    Msg :: iodata(),
+    Nonce :: binary(),
+    Key :: binary(),
+    Box :: binary().
+
+secretbox(xsalsa20poly1305, Msg, Nonce, Key) ->
+    case iolist_size(Msg) of
+        K when K =< ?SECRETBOX_SIZE ->
+            bump(enacl_nif:crypto_secretbox_xsalsa20poly1305_b([?S_ZEROBYTES, Msg], Nonce, Key),
+                ?SECRETBOX_REDUCTIONS,
+                ?SECRETBOX_SIZE,
+                K);
+        _ ->
+            enacl_nif:crypto_secretbox_xsalsa20poly1305([?S_ZEROBYTES, Msg], Nonce, Key)
+    end.
+
 %% @doc secretbox/3 encrypts a message with a key
 %%
 %% Given a `Msg', a `Nonce' and a `Key' encrypt the message with the Key while taking the
@@ -455,6 +483,28 @@ secretbox(Msg, Nonce, Key) ->
                K);
         _ ->
           enacl_nif:crypto_secretbox([?S_ZEROBYTES, Msg], Nonce, Key)
+    end.
+
+-spec secretbox_open(xsalsa20poly1305, CipherText, Nonce, Key) -> {ok, Msg} | {error, failed_verification}
+    when
+    CipherText :: iodata(),
+    Nonce :: binary(),
+    Key :: binary(),
+    Msg :: binary().
+secretbox_open(xsalsa20poly1305, CipherText, Nonce, Key) ->
+    case iolist_size(CipherText) of
+        K when K =< ?SECRETBOX_SIZE ->
+            R = case enacl_nif:crypto_secretbox_open_b([?S_BOXZEROBYTES, CipherText],
+                Nonce, Key) of
+                    {error, Err} -> {error, Err};
+                    Bin when is_binary(Bin) -> {ok, Bin}
+                end,
+            bump(R, ?SECRETBOX_OPEN_REDUCTIONS, ?SECRETBOX_SIZE, K);
+        _ ->
+            case enacl_nif:crypto_secretbox_open([?S_BOXZEROBYTES, CipherText], Nonce, Key) of
+                {error, Err} -> {error, Err};
+                Bin when is_binary(Bin) -> {ok, Bin}
+            end
     end.
 %% @doc secretbox_open/3 opens a sealed box.
 %%
@@ -483,12 +533,18 @@ secretbox_open(CipherText, Nonce, Key) ->
           end
    end.
 
+secretbox_nonce_size(xsalsa20poly1305) ->
+    enacl_nif:crypto_secretbox_xsalsa20poly1305_NONCEBYTES().
+
 %% @doc secretbox_nonce_size/0 returns the size of the secretbox nonce
 %%
 %% When encrypting with a secretbox, the nonce must have this size
 %% @end
 secretbox_nonce_size() ->
     enacl_nif:crypto_secretbox_NONCEBYTES().
+
+secretbox_key_size(xsalsa20poly1305) ->
+    enacl_nif:crypto_secretbox_xsalsa20poly1305_KEYBYTES().
 
 %% @doc secretbox_key_size/0 returns the size of the secretbox key
 %%
@@ -552,15 +608,34 @@ stream_xor(Msg, Nonce, Key) ->
         enacl_nif:crypto_stream_xor(Msg, Nonce, Key)
     end.
 
+-spec auth_key_size(hmacsha256) -> pos_integer().
+auth_key_size(hmacsha256) -> enacl_nif:crypto_auth_hmacsha256_KEYBYTES().
+
 %% @doc auth_key_size/0 returns the byte-size of the authentication key
 %% @end
 -spec auth_key_size() -> pos_integer().
 auth_key_size() -> enacl_nif:crypto_auth_KEYBYTES().
 
+-spec auth_size(hmacsha256) -> pos_integer().
+auth_size(hmacsha256) -> enacl_nif:crypto_auth_hmacsha256_BYTES().
+
 %% @doc auth_size/0 returns the byte-size of the authenticator
 %% @end
 -spec auth_size() -> pos_integer().
 auth_size() -> enacl_nif:crypto_auth_BYTES().
+
+-spec auth(hmacsha256, Msg, Key) -> Authenticator
+    when
+    Msg :: iodata(),
+    Key :: binary(),
+    Authenticator :: binary().
+auth(hmacsha256, Msg, Key) ->
+    case iolist_size(Msg) of
+        K when K =< ?AUTH_SIZE ->
+            bump(enacl_nif:crypto_auth_hmacsha256_b(Msg, Key), ?AUTH_REDUCTIONS, ?AUTH_SIZE, K);
+        _ ->
+            enacl_nif:crypto_auth_hmacsha256(Msg, Key)
+    end.
 
 %% @doc auth/2 produces an authenticator (MAC) for a message
 %%
@@ -579,6 +654,22 @@ auth(Msg, Key) ->
     _ ->
       enacl_nif:crypto_auth(Msg, Key)
   end.
+
+-spec auth_verify(hmacsha256, Authenticator, Msg, Key) -> boolean()
+    when
+    Authenticator :: binary(),
+    Msg :: iodata(),
+    Key :: binary().
+auth_verify(hmacsha256, A, M, K) ->
+    case iolist_size(M) of
+        K when K =< ?AUTH_SIZE ->
+            bump(enacl_nif:crypto_auth_hmacsha256_verify_b(A, M, K),
+                ?AUTH_REDUCTIONS,
+                ?AUTH_SIZE,
+                K);
+        _ ->
+            enacl_nif:crypto_auth_hmacsha256_verify(A, M, K)
+    end.
 
 %% @doc auth_verify/3 verifies an authenticator for a message
 %%
