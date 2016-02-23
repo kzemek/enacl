@@ -67,8 +67,8 @@ v_binary(_, _) -> false.
 
 
 %% Typical generators based on the binaries
-nonce() -> g_binary(enacl:box_nonce_size()).
-nonce_valid(N) -> v_binary(enacl:box_nonce_size(), N).
+nonce() -> g_binary(enacl_p:box_nonce_size()).
+nonce_valid(N) -> v_binary(enacl_p:box_nonce_size(), N).
 
 %% Generator of natural numbers
 g_nat() ->
@@ -86,19 +86,19 @@ is_nat(N) when is_integer(N), N >= 0 -> true;
 is_nat(_) -> false.
 
 keypair_good() ->
-    #{ public := PK, secret := SK} = enacl:box_keypair(),
+    #{ public := PK, secret := SK} = enacl_p:box_keypair(),
     {PK, SK}.
 
 keypair_bad() ->
     ?LET(X, elements([pk, sk]),
       begin
-        #{ public := PK, secret := SK} = enacl:box_keypair(),
+        #{ public := PK, secret := SK} = enacl_p:box_keypair(),
         case X of
             pk ->
-              PKBytes = enacl:box_public_key_bytes(),
+              PKBytes = enacl_p:box_public_key_bytes(),
               {oneof([return(a), nat(), ?SUCHTHAT(B, binary(), byte_size(B) /= PKBytes)]), SK};
             sk ->
-              SKBytes = enacl:box_secret_key_bytes(),
+              SKBytes = enacl_p:box_secret_key_bytes(),
               {PK, oneof([return(a), nat(), ?SUCHTHAT(B, binary(), byte_size(B) /= SKBytes)])}
         end
       end).
@@ -110,42 +110,42 @@ keypair() ->
 %% ---------------------------
 
 keypair_valid(PK, SK) when is_binary(PK), is_binary(SK) ->
-    PKBytes = enacl:box_public_key_bytes(),
-    SKBytes = enacl:box_secret_key_bytes(),
+    PKBytes = enacl_p:box_public_key_bytes(),
+    SKBytes = enacl_p:box_secret_key_bytes(),
     byte_size(PK) == PKBytes andalso byte_size(SK) == SKBytes;
 keypair_valid(_PK, _SK) -> false.
 
 prop_box_keypair() ->
     ?FORALL(_X, return(dummy),
-        ok_box_keypair(enacl:box_keypair())).
+        ok_box_keypair(enacl_p:box_keypair())).
 
 ok_box_keypair(#{ public := _, secret := _}) -> true;
 ok_box_keypair(_) -> false.
 
 box(Msg, Nonce , PK, SK) ->
     try
-        enacl:box(Msg, Nonce, PK, SK)
+        enacl_p:box(Msg, Nonce, PK, SK)
     catch
         error:badarg -> badarg
     end.
 
 box_seal(Msg, PK) ->
     try
-        enacl:box_seal(Msg, PK)
+        enacl_p:box_seal(Msg, PK)
     catch
        error:badarg -> badarg
     end.
 
 box_seal_open(Cph, PK, SK) ->
     try
-        enacl:box_seal_open(Cph, PK, SK)
+        enacl_p:box_seal_open(Cph, PK, SK)
     catch
         error:badarg -> badarg
     end.
 
 box_open(CphText, Nonce, PK, SK) ->
     try
-        enacl:box_open(CphText, Nonce, PK, SK)
+        enacl_p:box_open(CphText, Nonce, PK, SK)
     catch
          error:badarg -> badarg
     end.
@@ -163,12 +163,12 @@ prop_box_correct() ->
         begin
             case v_iodata(Msg) andalso nonce_valid(Nonce) andalso keypair_valid(PK1, SK1) andalso keypair_valid(PK2, SK2) of
                 true ->
-                    Key = enacl:box_beforenm(PK2, SK1),
-                    Key = enacl:box_beforenm(PK1, SK2),
-                    CipherText = enacl:box(Msg, Nonce, PK2, SK1),
-                    CipherText = enacl:box_afternm(Msg, Nonce, Key),
-                    {ok, DecodedMsg} = enacl:box_open(CipherText, Nonce, PK1, SK2),
-                    {ok, DecodedMsg} = enacl:box_open_afternm(CipherText, Nonce, Key),
+                    Key = enacl_p:box_beforenm(PK2, SK1),
+                    Key = enacl_p:box_beforenm(PK1, SK2),
+                    CipherText = enacl_p:box(Msg, Nonce, PK2, SK1),
+                    CipherText = enacl_p:box_afternm(Msg, Nonce, Key),
+                    {ok, DecodedMsg} = enacl_p:box_open(CipherText, Nonce, PK1, SK2),
+                    {ok, DecodedMsg} = enacl_p:box_open_afternm(CipherText, Nonce, Key),
                     equals(iolist_to_binary(Msg), DecodedMsg);
                 false ->
                     case box(Msg, Nonce, PK2, SK1) of
@@ -190,10 +190,10 @@ prop_box_failure_integrity() ->
                  andalso keypair_valid(PK1, SK1)
                  andalso keypair_valid(PK2, SK2) of
                 true ->
-                    Key = enacl:box_beforenm(PK2, SK1),
-                    CipherText = enacl:box(Msg, Nonce, PK2, SK1),
-                    Err = enacl:box_open([<<"x">>, CipherText], Nonce, PK1, SK2),
-                    Err = enacl:box_open_afternm([<<"x">>, CipherText], Nonce, Key),
+                    Key = enacl_p:box_beforenm(PK2, SK1),
+                    CipherText = enacl_p:box(Msg, Nonce, PK2, SK1),
+                    Err = enacl_p:box_open([<<"x">>, CipherText], Nonce, PK1, SK2),
+                    Err = enacl_p:box_open_afternm([<<"x">>, CipherText], Nonce, Key),
                     equals(Err, {error, failed_verification});
                 false ->
                     case box(Msg, Nonce, PK2, SK1) of
@@ -203,14 +203,14 @@ prop_box_failure_integrity() ->
                     end
             end
         end).
-        
+
 prop_seal_box_failure_integrity() ->
     ?FORALL({Msg, {PK1, SK1}}, {fault_rate(1,40,g_iodata()), fault_rate(1,40,keypair())},
       begin
          case v_iodata(Msg) andalso keypair_valid(PK1, SK1) of
            true ->
-             CT = enacl:box_seal(Msg, PK1),
-             Err = enacl:box_seal_open([<<"x">>, CT], PK1, SK1),
+             CT = enacl_p:box_seal(Msg, PK1),
+             Err = enacl_p:box_seal_open([<<"x">>, CT], PK1, SK1),
              equals(Err, {error, failed_verification});
            false ->
              case box_seal(Msg, PK1) of
@@ -228,8 +228,8 @@ prop_seal_box_correct() ->
      begin
          case v_iodata(Msg) andalso keypair_valid(PK1, SK1) of
              true ->
-                 SealedCipherText = enacl:box_seal(Msg, PK1),
-                 {ok, DecodedMsg} = enacl:box_seal_open(SealedCipherText, PK1, SK1),
+                 SealedCipherText = enacl_p:box_seal(Msg, PK1),
+                 {ok, DecodedMsg} = enacl_p:box_seal_open(SealedCipherText, PK1, SK1),
                  equals(iolist_to_binary(Msg), DecodedMsg);
              false ->
                 case box_seal(Msg, PK1) of
@@ -244,27 +244,27 @@ beforenm_key() ->
     ?LET([{PK1, SK1}, {PK2, SK2}], [fault_rate(1, 40, keypair()), fault_rate(1, 40, keypair())],
         case keypair_valid(PK1, SK1) andalso keypair_valid(PK2, SK2) of
             true ->
-                enacl:box_beforenm(PK1, SK2);
+                enacl_p:box_beforenm(PK1, SK2);
             false ->
                 oneof([
                   elements([a,b,c]),
                   real(),
-                  ?SUCHTHAT(X, binary(), byte_size(X) /= enacl:box_beforenm_bytes())
+                  ?SUCHTHAT(X, binary(), byte_size(X) /= enacl_p:box_beforenm_bytes())
                   ])
         end).
 
-v_key(K) when is_binary(K) -> byte_size(K) == enacl:box_beforenm_bytes();
+v_key(K) when is_binary(K) -> byte_size(K) == enacl_p:box_beforenm_bytes();
 v_key(_) -> false.
 
 prop_beforenm_correct() ->
     ?FORALL([{PK1, SK1}, {PK2, SK2}], [fault_rate(1, 40, keypair()), fault_rate(1, 40, keypair())],
         case keypair_valid(PK1, SK1) andalso keypair_valid(PK2, SK2) of
             true ->
-                equals(enacl:box_beforenm(PK1, SK2), enacl:box_beforenm(PK2, SK1));
+                equals(enacl_p:box_beforenm(PK1, SK2), enacl_p:box_beforenm(PK2, SK1));
             false ->
                 badargs(fun() ->
-                	K = enacl:box_beforenm(PK1, SK2),
-                	K = enacl:box_beforenm(PK2, SK1)
+                	K = enacl_p:box_beforenm(PK1, SK2),
+                	K = enacl_p:box_beforenm(PK2, SK1)
                 end)
         end).
 
@@ -276,12 +276,12 @@ prop_afternm_correct() ->
       begin
           case v_iodata(Msg) andalso nonce_valid(Nonce) andalso v_key(Key) of
               true ->
-                  CipherText = enacl:box_afternm(Msg, Nonce, Key),
-                  equals({ok, iolist_to_binary(Msg)}, enacl:box_open_afternm(CipherText, Nonce, Key));
+                  CipherText = enacl_p:box_afternm(Msg, Nonce, Key),
+                  equals({ok, iolist_to_binary(Msg)}, enacl_p:box_open_afternm(CipherText, Nonce, Key));
               false ->
-                  try enacl:box_afternm(Msg, Nonce, Key) of
+                  try enacl_p:box_afternm(Msg, Nonce, Key) of
                       CipherText ->
-                          try enacl:box_open_afternm(CipherText, Nonce, Key) of
+                          try enacl_p:box_open_afternm(CipherText, Nonce, Key) of
                               {ok, _M} -> false;
                               {error, failed_validation} -> false
                           catch
@@ -299,40 +299,40 @@ prop_afternm_correct() ->
 prop_sign_keypair() ->
     ?FORALL(_D, return(dummy),
       begin
-        #{ public := _, secret := _ } = enacl:sign_keypair(),
+        #{ public := _, secret := _ } = enacl_p:sign_keypair(),
         true
       end).
 
 sign_keypair_bad() ->
   ?LET(X, elements([pk, sk]),
     begin
-      KP = enacl:sign_keypair(),
+      KP = enacl_p:sign_keypair(),
       case X of
         pk ->
-          Sz = enacl:sign_keypair_public_size(),
+          Sz = enacl_p:sign_keypair_public_size(),
           ?LET(Wrong, oneof([a, int(), ?SUCHTHAT(B, binary(), byte_size(B) /= Sz)]),
             KP#{ public := Wrong });
         sk ->
-          Sz = enacl:sign_keypair_secret_size(),
+          Sz = enacl_p:sign_keypair_secret_size(),
           ?LET(Wrong, oneof([a, int(), ?SUCHTHAT(B, binary(), byte_size(B) /= Sz)]),
             KP#{ secret := Wrong })
       end
     end).
 
 sign_keypair_good() ->
-  return(enacl:sign_keypair()).
+  return(enacl_p:sign_keypair()).
 
 sign_keypair() ->
   fault(sign_keypair_bad(), sign_keypair_good()).
 
 sign_keypair_public_valid(#{ public := Public })
   when is_binary(Public) ->
-    byte_size(Public) == enacl:sign_keypair_public_size();
+    byte_size(Public) == enacl_p:sign_keypair_public_size();
 sign_keypair_public_valid(_) -> false.
 
 sign_keypair_secret_valid(#{ secret := Secret })
   when is_binary(Secret) ->
-    byte_size(Secret) == enacl:sign_keypair_secret_size();
+    byte_size(Secret) == enacl_p:sign_keypair_secret_size();
 sign_keypair_secret_valid(_) -> false.
 
 sign_keypair_valid(KP) ->
@@ -346,11 +346,11 @@ prop_sign_detached() ->
           case v_iodata(Msg) andalso sign_keypair_secret_valid(KeyPair) of
             true ->
                 #{ secret := Secret } = KeyPair,
-                enacl:sign_detached(Msg, Secret),
+                enacl_p:sign_detached(Msg, Secret),
                 true;
             false ->
                 #{ secret := Secret } = KeyPair,
-                badargs(fun() -> enacl:sign_detached(Msg, Secret) end)
+                badargs(fun() -> enacl_p:sign_detached(Msg, Secret) end)
           end
       end).
 
@@ -362,17 +362,17 @@ prop_sign() ->
         case v_iodata(Msg) andalso sign_keypair_secret_valid(KeyPair) of
           true ->
             #{ secret := Secret } = KeyPair,
-            enacl:sign(Msg, Secret),
+            enacl_p:sign(Msg, Secret),
             true;
           false ->
             #{ secret := Secret } = KeyPair,
-            badargs(fun() -> enacl:sign(Msg, Secret) end)
+            badargs(fun() -> enacl_p:sign(Msg, Secret) end)
         end
       end).
 
 signed_message_good(M) ->
-    #{ public := PK, secret := SK} = enacl:sign_keypair(),
-    SM = enacl:sign(M, SK),
+    #{ public := PK, secret := SK} = enacl_p:sign_keypair(),
+    SM = enacl_p:sign(M, SK),
     frequency([
         {3, return({{valid, SM}, PK})},
         {1, ?LET(X, elements([sm, pk]),
@@ -382,8 +382,8 @@ signed_message_good(M) ->
                end)}]).
 
 signed_message_good_d(M) ->
-    #{ public := PK, secret := SK} = enacl:sign_keypair(),
-    Sig = enacl:sign_detached(M, SK),
+    #{ public := PK, secret := SK} = enacl_p:sign_keypair(),
+    Sig = enacl_p:sign_detached(M, SK),
     frequency([
         {3, return({{valid, Sig}, PK})},
         {1, ?LET(X, elements([sm, pk]),
@@ -393,11 +393,11 @@ signed_message_good_d(M) ->
                end)}]).
 
 signed_message_bad() ->
-    Sz = enacl:sign_keypair_public_size(),
+    Sz = enacl_p:sign_keypair_public_size(),
     {binary(), oneof([a, int(), ?SUCHTHAT(B, binary(Sz), byte_size(B) /= Sz)])}.
 
 signed_message_bad_d() ->
-    Sz = enacl:sign_keypair_public_size(),
+    Sz = enacl_p:sign_keypair_public_size(),
     {binary(), oneof([a, int(), ?SUCHTHAT(B, binary(Sz), byte_size(B) /= Sz)])}.
 
 signed_message(M) ->
@@ -417,12 +417,12 @@ prop_sign_detached_open() ->
               true ->
                   case SignMsg of
                     {valid, Sig} ->
-                        equals({ok, Msg}, enacl:sign_verify_detached(Sig, Msg, PK));
+                        equals({ok, Msg}, enacl_p:sign_verify_detached(Sig, Msg, PK));
                     {invalid, Sig} ->
-                        equals({error, failed_verification}, enacl:sign_verify_detached(Sig, Msg, PK))
+                        equals({error, failed_verification}, enacl_p:sign_verify_detached(Sig, Msg, PK))
                   end;
               false ->
-                  badargs(fun() -> enacl:sign_verify_detached(SignMsg, Msg, PK) end)
+                  badargs(fun() -> enacl_p:sign_verify_detached(SignMsg, Msg, PK) end)
           end)).
 
 prop_sign_open() ->
@@ -432,12 +432,12 @@ prop_sign_open() ->
               true ->
                   case SignMsg of
                     {valid, SM} ->
-                        equals({ok, iolist_to_binary(Msg)}, enacl:sign_open(SM, PK));
+                        equals({ok, iolist_to_binary(Msg)}, enacl_p:sign_open(SM, PK));
                     {invalid, SM} ->
-                        equals({error, failed_verification}, enacl:sign_open(SM, PK))
+                        equals({error, failed_verification}, enacl_p:sign_open(SM, PK))
                   end;
               false ->
-                  badargs(fun() -> enacl:sign_open(SignMsg, PK) end)
+                  badargs(fun() -> enacl_p:sign_open(SignMsg, PK) end)
           end)).
 
 %% CRYPTO SECRET BOX
@@ -447,48 +447,48 @@ prop_sign_open() ->
 %% for keys in many locations.
 
 key_sz(Sz) ->
-  equals(enacl:secretbox_key_size(), Sz).
+  equals(enacl_p:secretbox_key_size(), Sz).
 
 prop_key_sizes() ->
-    conjunction([{secret, key_sz(enacl:secretbox_key_size())},
-                 {stream, key_sz(enacl:stream_key_size())},
-                 {auth, key_sz(enacl:auth_key_size())},
-                 {onetimeauth, key_sz(enacl:onetime_auth_key_size())}]).
+    conjunction([{secret, key_sz(enacl_p:secretbox_key_size())},
+                 {stream, key_sz(enacl_p:stream_key_size())},
+                 {auth, key_sz(enacl_p:auth_key_size())},
+                 {onetimeauth, key_sz(enacl_p:onetime_auth_key_size())}]).
 
 nonce_sz(Sz) ->
-  equals(enacl:secretbox_nonce_size(), Sz).
+  equals(enacl_p:secretbox_nonce_size(), Sz).
 
 prop_nonce_sizes() ->
-    conjunction([{secret, nonce_sz(enacl:secretbox_nonce_size())},
-                 {stream, nonce_sz(enacl:stream_nonce_size())}]).
+    conjunction([{secret, nonce_sz(enacl_p:secretbox_nonce_size())},
+                 {stream, nonce_sz(enacl_p:stream_nonce_size())}]).
 
 secret_key_good() ->
-	Sz = enacl:secretbox_key_size(),
+	Sz = enacl_p:secretbox_key_size(),
 	binary(Sz).
 
 secret_key_bad() ->
 	oneof([return(a),
 	       nat(),
-	       ?SUCHTHAT(B, binary(), byte_size(B) /= enacl:secretbox_key_size())]).
+	       ?SUCHTHAT(B, binary(), byte_size(B) /= enacl_p:secretbox_key_size())]).
 
 secret_key() ->
 	fault(secret_key_bad(), secret_key_good()).
 
 secret_key_valid(SK) when is_binary(SK) ->
-	Sz = enacl:secretbox_key_size(),
+	Sz = enacl_p:secretbox_key_size(),
 	byte_size(SK) == Sz;
 secret_key_valid(_SK) -> false.
 
 secretbox(Msg, Nonce, Key) ->
   try
-    enacl:secretbox(Msg, Nonce, Key)
+    enacl_p:secretbox(Msg, Nonce, Key)
   catch
     error:badarg -> badarg
   end.
 
 secretbox_open(Msg, Nonce, Key) ->
   try
-    enacl:secretbox_open(Msg, Nonce, Key)
+    enacl_p:secretbox_open(Msg, Nonce, Key)
   catch
     error:badarg -> badarg
   end.
@@ -501,8 +501,8 @@ prop_secretbox_correct() ->
       begin
         case v_iodata(Msg) andalso nonce_valid(Nonce) andalso secret_key_valid(Key) of
           true ->
-             CipherText = enacl:secretbox(Msg, Nonce, Key),
-             {ok, DecodedMsg} = enacl:secretbox_open(CipherText, Nonce, Key),
+             CipherText = enacl_p:secretbox(Msg, Nonce, Key),
+             {ok, DecodedMsg} = enacl_p:secretbox_open(CipherText, Nonce, Key),
              equals(iolist_to_binary(Msg), DecodedMsg);
           false ->
              case secretbox(Msg, Nonce, Key) of
@@ -516,8 +516,8 @@ prop_secretbox_correct() ->
 prop_secretbox_failure_integrity() ->
     ?FORALL({Msg, Nonce, Key}, {g_iodata(), nonce(), secret_key()},
       begin
-        CipherText = enacl:secretbox(Msg, Nonce, Key),
-        Err = enacl:secretbox_open([<<"x">>, CipherText], Nonce, Key),
+        CipherText = enacl_p:secretbox(Msg, Nonce, Key),
+        Err = enacl_p:secretbox_open([<<"x">>, CipherText], Nonce, Key),
         equals(Err, {error, failed_verification})
       end).
 
@@ -529,10 +529,10 @@ prop_stream_correct() ->
              fault_rate(1, 40, secret_key())},
         case Len >= 0 andalso nonce_valid(Nonce) andalso secret_key_valid(Key) of
           true ->
-              CipherStream = enacl:stream(Len, Nonce, Key),
+              CipherStream = enacl_p:stream(Len, Nonce, Key),
               equals(Len, byte_size(CipherStream));
           false ->
-              badargs(fun() -> enacl:stream(Len, Nonce, Key) end)
+              badargs(fun() -> enacl_p:stream(Len, Nonce, Key) end)
         end).
 
 xor_bytes(<<A, As/binary>>, <<B, Bs/binary>>) ->
@@ -546,15 +546,15 @@ prop_stream_xor_correct() ->
              fault_rate(1, 40, secret_key())},
         case v_iodata(Msg) andalso nonce_valid(Nonce) andalso secret_key_valid(Key) of
             true ->
-                Stream = enacl:stream(iolist_size(Msg), Nonce, Key),
-                CipherText = enacl:stream_xor(Msg, Nonce, Key),
-                StreamXor = enacl:stream_xor(CipherText, Nonce, Key),
+                Stream = enacl_p:stream(iolist_size(Msg), Nonce, Key),
+                CipherText = enacl_p:stream_xor(Msg, Nonce, Key),
+                StreamXor = enacl_p:stream_xor(CipherText, Nonce, Key),
                 conjunction([
                     {'xor', equals(iolist_to_binary(Msg), StreamXor)},
                     {stream, equals(iolist_to_binary(xor_bytes(Stream, iolist_to_binary(Msg))), CipherText)}
                 ]);
             false ->
-                badargs(fun() -> enacl:stream_xor(Msg, Nonce, Key) end)
+                badargs(fun() -> enacl_p:stream_xor(Msg, Nonce, Key) end)
         end).
 
 %% CRYPTO AUTH
@@ -564,26 +564,26 @@ prop_auth_correct() ->
              fault_rate(1, 40, secret_key())},
        case v_iodata(Msg) andalso secret_key_valid(Key) of
          true ->
-           Authenticator = enacl:auth(Msg, Key),
-           equals(Authenticator, enacl:auth(Msg, Key));
+           Authenticator = enacl_p:auth(Msg, Key),
+           equals(Authenticator, enacl_p:auth(Msg, Key));
          false ->
-           badargs(fun() -> enacl:auth(Msg, Key) end)
+           badargs(fun() -> enacl_p:auth(Msg, Key) end)
        end).
 
 authenticator_bad() ->
-    oneof([a, int(), ?SUCHTHAT(X, binary(), byte_size(X) /= enacl:auth_size())]).
+    oneof([a, int(), ?SUCHTHAT(X, binary(), byte_size(X) /= enacl_p:auth_size())]).
 
 authenticator_good(Msg, Key) when is_binary(Key) ->
-    Sz = enacl:secretbox_key_size(),
+    Sz = enacl_p:secretbox_key_size(),
     case v_iodata(Msg) andalso byte_size(Key) == Sz of
       true ->
-        frequency([{1, ?LAZY({invalid, binary(enacl:auth_size())})},
-                   {3, return({valid, enacl:auth(Msg, Key)})}]);
+        frequency([{1, ?LAZY({invalid, binary(enacl_p:auth_size())})},
+                   {3, return({valid, enacl_p:auth(Msg, Key)})}]);
       false ->
-        binary(enacl:auth_size())
+        binary(enacl_p:auth_size())
     end;
 authenticator_good(_Msg, _Key) ->
-    binary(enacl:auth_size()).
+    binary(enacl_p:auth_size()).
 
 authenticator(Msg, Key) ->
   fault(authenticator_bad(), authenticator_good(Msg, Key)).
@@ -601,12 +601,12 @@ prop_auth_verify_correct() ->
           true ->
             case Authenticator of
               {valid, A} ->
-                equals(true, enacl:auth_verify(A, Msg, Key));
+                equals(true, enacl_p:auth_verify(A, Msg, Key));
               {invalid, A} ->
-                equals(false, enacl:auth_verify(A, Msg, Key))
+                equals(false, enacl_p:auth_verify(A, Msg, Key))
             end;
           false ->
-            badargs(fun() -> enacl:auth_verify(Authenticator, Msg, Key) end)
+            badargs(fun() -> enacl_p:auth_verify(Authenticator, Msg, Key) end)
         end)).
 
 %% CRYPTO ONETIME AUTH
@@ -616,26 +616,26 @@ prop_onetimeauth_correct() ->
              fault_rate(1, 40, secret_key())},
        case v_iodata(Msg) andalso secret_key_valid(Key) of
          true ->
-           Authenticator = enacl:onetime_auth(Msg, Key),
-           equals(Authenticator, enacl:onetime_auth(Msg, Key));
+           Authenticator = enacl_p:onetime_auth(Msg, Key),
+           equals(Authenticator, enacl_p:onetime_auth(Msg, Key));
          false ->
-           badargs(fun() -> enacl:onetime_auth(Msg, Key) end)
+           badargs(fun() -> enacl_p:onetime_auth(Msg, Key) end)
        end).
 
 ot_authenticator_bad() ->
-    oneof([a, int(), ?SUCHTHAT(X, binary(), byte_size(X) /= enacl:onetime_auth_size())]).
+    oneof([a, int(), ?SUCHTHAT(X, binary(), byte_size(X) /= enacl_p:onetime_auth_size())]).
 
 ot_authenticator_good(Msg, Key) when is_binary(Key) ->
-    Sz = enacl:secretbox_key_size(),
+    Sz = enacl_p:secretbox_key_size(),
     case v_iodata(Msg) andalso byte_size(Key) == Sz of
       true ->
-        frequency([{1, ?LAZY({invalid, binary(enacl:onetime_auth_size())})},
-                   {3, return({valid, enacl:onetime_auth(Msg, Key)})}]);
+        frequency([{1, ?LAZY({invalid, binary(enacl_p:onetime_auth_size())})},
+                   {3, return({valid, enacl_p:onetime_auth(Msg, Key)})}]);
       false ->
-        binary(enacl:onetime_auth_size())
+        binary(enacl_p:onetime_auth_size())
     end;
 ot_authenticator_good(_Msg, _Key) ->
-    binary(enacl:auth_size()).
+    binary(enacl_p:auth_size()).
 
 ot_authenticator(Msg, Key) ->
   fault(ot_authenticator_bad(), ot_authenticator_good(Msg, Key)).
@@ -653,12 +653,12 @@ prop_onetime_auth_verify_correct() ->
           true ->
             case Authenticator of
               {valid, A} ->
-                equals(true, enacl:onetime_auth_verify(A, Msg, Key));
+                equals(true, enacl_p:onetime_auth_verify(A, Msg, Key));
               {invalid, A} ->
-                equals(false, enacl:onetime_auth_verify(A, Msg, Key))
+                equals(false, enacl_p:onetime_auth_verify(A, Msg, Key))
             end;
           false ->
-            badargs(fun() -> enacl:onetime_auth_verify(Authenticator, Msg, Key) end)
+            badargs(fun() -> enacl_p:onetime_auth_verify(Authenticator, Msg, Key) end)
         end)).
 
 %% HASHING
@@ -670,10 +670,10 @@ diff_pair() ->
 prop_crypto_hash_eq() ->
     ?FORALL(X, g_iodata(),
         case v_iodata(X) of
-          true -> equals(enacl:hash(X), enacl:hash(X));
+          true -> equals(enacl_p:hash(X), enacl_p:hash(X));
           false ->
             try
-              enacl:hash(X),
+              enacl_p:hash(X),
               false
             catch
               error:badarg -> true
@@ -683,7 +683,7 @@ prop_crypto_hash_eq() ->
 
 prop_crypto_hash_neq() ->
     ?FORALL({X, Y}, diff_pair(),
-        enacl:hash(X) /= enacl:hash(Y)
+        enacl_p:hash(X) /= enacl_p:hash(Y)
     ).
 
 %% STRING COMPARISON
@@ -713,10 +713,10 @@ prop_verify_16() ->
     ?FORALL({X, Y}, verify_pair(16),
       case verify_pair_valid(16, X, Y) of
           true ->
-              equals(X == Y, enacl:verify_16(X, Y));
+              equals(X == Y, enacl_p:verify_16(X, Y));
           false ->
               try
-                 enacl:verify_16(X, Y),
+                 enacl_p:verify_16(X, Y),
                  false
               catch
                   error:badarg -> true
@@ -727,10 +727,10 @@ prop_verify_32() ->
     ?FORALL({X, Y}, verify_pair(32),
       case verify_pair_valid(32, X, Y) of
           true ->
-              equals(X == Y, enacl:verify_32(X, Y));
+              equals(X == Y, enacl_p:verify_32(X, Y));
           false ->
               try
-                 enacl:verify_32(X, Y),
+                 enacl_p:verify_32(X, Y),
                  false
               catch
                   error:badarg -> true
@@ -742,10 +742,10 @@ prop_randombytes() ->
     ?FORALL(X, g_nat(),
         case is_nat(X) of
             true ->
-                is_binary(enacl:randombytes(X));
+                is_binary(enacl_p:randombytes(X));
             false ->
                 try
-                    enacl:randombytes(X),
+                    enacl_p:randombytes(X),
                     false
                 catch
                     error:badarg ->
@@ -756,7 +756,7 @@ prop_randombytes() ->
 %% SCRAMBLING
 prop_scramble_block() ->
     ?FORALL({Block, Key}, {binary(16), eqc_gen:largebinary(32)},
-        is_binary(enacl_ext:scramble_block_16(Block, Key))).
+        is_binary(enacl_p_ext:scramble_block_16(Block, Key))).
 
 %% HELPERS
 badargs(Thunk) ->
@@ -771,27 +771,27 @@ badargs(Thunk) ->
 % Joel Test Blobs
 
 test_basic_signing() ->
-  #{ public := PK0, secret := SK0 } = enacl:sign_keypair(),
-  #{ public := PK1, secret := SK1 } = enacl:sign_keypair(),
+  #{ public := PK0, secret := SK0 } = enacl_p:sign_keypair(),
+  #{ public := PK1, secret := SK1 } = enacl_p:sign_keypair(),
   MSG0 = <<"This is super s3Kr3t, srsly!">>,
   [
     %% (+) Sign and open using valid keypair
-    case enacl:sign_open(enacl:sign(MSG0, SK0), PK0) of
+    case enacl_p:sign_open(enacl_p:sign(MSG0, SK0), PK0) of
         {ok,MSG1} -> MSG0==MSG1;
         _         -> false
     end
   , %% (-) Sign and open using invalid keypair
-    case enacl:sign_open(enacl:sign(MSG0, SK0), PK1) of
+    case enacl_p:sign_open(enacl_p:sign(MSG0, SK0), PK1) of
         {error,failed_verification} -> true;
         _                           -> false
     end
   , %% (+) Detached mode sig and verify
-    { enacl:sign_verify_detached(enacl:sign_detached(MSG0, SK0), MSG0, PK0)
-    , enacl:sign_verify_detached(enacl:sign_detached(MSG0, SK1), MSG0, PK1)
+    { enacl_p:sign_verify_detached(enacl_p:sign_detached(MSG0, SK0), MSG0, PK0)
+    , enacl_p:sign_verify_detached(enacl_p:sign_detached(MSG0, SK1), MSG0, PK1)
     }
   , %% (-) Incorrect sigs/PKs/messages given during verify
-    { false == enacl:sign_verify_detached(enacl:sign_detached(MSG0, SK0), MSG0, PK1)
-    , false == enacl:sign_verify_detached(enacl:sign_detached(MSG0, SK1), MSG0, PK0)
-    , false == enacl:sign_verify_detached(enacl:sign_detached(MSG0, SK0), <<"bzzt">>, PK0)
+    { false == enacl_p:sign_verify_detached(enacl_p:sign_detached(MSG0, SK0), MSG0, PK1)
+    , false == enacl_p:sign_verify_detached(enacl_p:sign_detached(MSG0, SK1), MSG0, PK0)
+    , false == enacl_p:sign_verify_detached(enacl_p:sign_detached(MSG0, SK0), <<"bzzt">>, PK0)
     }
   ].

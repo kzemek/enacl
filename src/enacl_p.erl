@@ -14,7 +14,7 @@
 %%% <p><b>Note:</b> All functions will fail with a `badarg' error if given incorrect
 %%% parameters.</p>
 %%% @end.
--module(enacl).
+-module(enacl_p).
 
 %% Public key crypto
 -export([
@@ -140,12 +140,12 @@
 
 %% @doc Verify makes sure the constants defined in libsodium matches ours
 verify() ->
-    true = equals(binary:copy(<<0>>, enacl_nif:crypto_box_ZEROBYTES()), ?P_ZEROBYTES),
-    true = equals(binary:copy(<<0>>, enacl_nif:crypto_box_BOXZEROBYTES()), ?P_BOXZEROBYTES),
-    true = equals(binary:copy(<<0>>, enacl_nif:crypto_secretbox_ZEROBYTES()), ?S_ZEROBYTES),
-    true = equals(binary:copy(<<0>>, enacl_nif:crypto_secretbox_BOXZEROBYTES()),
+    true = equals(binary:copy(<<0>>, enacl_p_nif:crypto_box_ZEROBYTES()), ?P_ZEROBYTES),
+    true = equals(binary:copy(<<0>>, enacl_p_nif:crypto_box_BOXZEROBYTES()), ?P_BOXZEROBYTES),
+    true = equals(binary:copy(<<0>>, enacl_p_nif:crypto_secretbox_ZEROBYTES()), ?S_ZEROBYTES),
+    true = equals(binary:copy(<<0>>, enacl_p_nif:crypto_secretbox_BOXZEROBYTES()),
     	?S_BOXZEROBYTES),
-    
+
     Verifiers = [
         {crypto_stream_KEYBYTES, ?CRYPTO_STREAM_KEYBYTES},
         {crypto_stream_NONCEBYTES, ?CRYPTO_STREAM_NONCEBYTES},
@@ -155,10 +155,10 @@ verify() ->
         {crypto_secretbox_BOXZEROBYTES, ?CRYPTO_SECRETBOX_BOXZEROBYTES}
     ],
     run_verifiers(Verifiers).
-    
+
 run_verifiers([]) -> ok;
 run_verifiers([{V, R} | Vs]) ->
-    case enacl_nif:V() of
+    case enacl_p_nif:V() of
         R -> run_verifiers(Vs);
         Other -> {error, {verifier, V, {R, '/=', Other}}}
     end.
@@ -183,9 +183,9 @@ equals(X,Y) -> {X, '/=', Y}.
 hash(Bin) ->
     case iolist_size(Bin) of
         K when K =< ?HASH_SIZE ->
-            bump(enacl_nif:crypto_hash_b(Bin), ?HASH_REDUCTIONS, ?HASH_SIZE, K);
+            bump(enacl_p_nif:crypto_hash_b(Bin), ?HASH_REDUCTIONS, ?HASH_SIZE, K);
         _ ->
-            enacl_nif:crypto_hash(Bin)
+            enacl_p_nif:crypto_hash(Bin)
     end.
 
 %% @doc verify_16/2 implements constant time 16-byte binary() verification
@@ -200,7 +200,7 @@ hash(Bin) ->
 %% <p>Verification returns a boolean. `true' if the strings match, `false' otherwise.</p>
 %% @end
 -spec verify_16(binary(), binary()) -> boolean().
-verify_16(X, Y) when is_binary(X), is_binary(Y) -> enacl_nif:crypto_verify_16(X, Y);
+verify_16(X, Y) when is_binary(X), is_binary(Y) -> enacl_p_nif:crypto_verify_16(X, Y);
 verify_16(_, _) -> error(badarg).
 
 %% @doc verify_32/2 implements constant time 32-byte iolist() verification
@@ -208,7 +208,7 @@ verify_16(_, _) -> error(badarg).
 %% This function works as {@link verify_16/2} but does so on 32 byte strings. Same caveats apply.
 %% @end
 -spec verify_32(binary(), binary()) -> boolean().
-verify_32(X, Y) when is_binary(X), is_binary(Y) -> enacl_nif:crypto_verify_32(X, Y);
+verify_32(X, Y) when is_binary(X), is_binary(Y) -> enacl_p_nif:crypto_verify_32(X, Y);
 verify_32(_, _) -> error(badarg).
 
 %% Public Key Crypto
@@ -220,7 +220,7 @@ verify_32(_, _) -> error(badarg).
 %% @end.
 -spec box_keypair() -> #{ atom() => binary() }.
 box_keypair() ->
-	{PK, SK} = enacl_nif:crypto_box_keypair(),
+	{PK, SK} = enacl_p_nif:crypto_box_keypair(),
 	#{ public => PK, secret => SK}.
 
 
@@ -236,7 +236,7 @@ box_keypair() ->
        SK :: binary(),
        CipherText :: binary().
 box(Msg, Nonce, PK, SK) ->
-    enacl_nif:crypto_box([?P_ZEROBYTES, Msg], Nonce, PK, SK).
+    enacl_p_nif:crypto_box([?P_ZEROBYTES, Msg], Nonce, PK, SK).
 
 %% @doc box_open/4 decrypts+verifies a message from another party.
 %%
@@ -251,7 +251,7 @@ box(Msg, Nonce, PK, SK) ->
        SK :: binary(),
        Msg :: binary().
 box_open(CipherText, Nonce, PK, SK) ->
-    case enacl_nif:crypto_box_open([?P_BOXZEROBYTES, CipherText], Nonce, PK, SK) of
+    case enacl_p_nif:crypto_box_open([?P_BOXZEROBYTES, CipherText], Nonce, PK, SK) of
         {error, Err} -> {error, Err};
         Bin when is_binary(Bin) -> {ok, Bin}
     end.
@@ -263,7 +263,7 @@ box_open(CipherText, Nonce, PK, SK) ->
       PK :: binary(),
       SK :: binary().
 box_beforenm(PK, SK) ->
-    R = enacl_nif:crypto_box_beforenm(PK, SK),
+    R = enacl_p_nif:crypto_box_beforenm(PK, SK),
     erlang:bump_reductions(?BOX_BEFORENM_REDUCTIONS),
     R.
 
@@ -282,10 +282,10 @@ box_beforenm(PK, SK) ->
 box_afternm(Msg, Nonce, Key) ->
     case iolist_size(Msg) of
         K when K =< ?BOX_AFTERNM_SIZE ->
-            bump(enacl_nif:crypto_box_afternm_b([?P_ZEROBYTES, Msg], Nonce, Key),
+            bump(enacl_p_nif:crypto_box_afternm_b([?P_ZEROBYTES, Msg], Nonce, Key),
             	?BOX_AFTERNM_REDUCTIONS, ?BOX_AFTERNM_SIZE, K);
         _ ->
-            enacl_nif:crypto_box_afternm([?P_ZEROBYTES, Msg], Nonce, Key)
+            enacl_p_nif:crypto_box_afternm([?P_ZEROBYTES, Msg], Nonce, Key)
     end.
 
 %% @doc box_open_afternm/3 works like `box_open/4` but uses a precomputed key
@@ -304,13 +304,13 @@ box_open_afternm(CipherText, Nonce, Key) ->
     case iolist_size(CipherText) of
         K when K =< ?BOX_AFTERNM_SIZE ->
            R =
-            case enacl_nif:crypto_box_open_afternm_b([?P_BOXZEROBYTES, CipherText], Nonce, Key) of
+            case enacl_p_nif:crypto_box_open_afternm_b([?P_BOXZEROBYTES, CipherText], Nonce, Key) of
               {error, Err} -> {error, Err};
               Bin when is_binary(Bin) -> {ok, Bin}
             end,
            bump(R, ?BOX_AFTERNM_REDUCTIONS, ?BOX_AFTERNM_SIZE, K);
         _ ->
-            case enacl_nif:crypto_box_open_afternm([?P_BOXZEROBYTES, CipherText], Nonce, Key) of
+            case enacl_p_nif:crypto_box_open_afternm([?P_BOXZEROBYTES, CipherText], Nonce, Key) of
               {error, Err} -> {error, Err};
               Bin when is_binary(Bin) -> {ok, Bin}
             end
@@ -322,26 +322,26 @@ box_open_afternm(CipherText, Nonce, Key) ->
 %% @end.
 -spec box_nonce_size() -> pos_integer().
 box_nonce_size() ->
-	enacl_nif:crypto_box_NONCEBYTES().
+	enacl_p_nif:crypto_box_NONCEBYTES().
 
 %% @private
 -spec box_public_key_bytes() -> pos_integer().
 box_public_key_bytes() ->
-	enacl_nif:crypto_box_PUBLICKEYBYTES().
+	enacl_p_nif:crypto_box_PUBLICKEYBYTES().
 
 %% @private
 box_beforenm_bytes() ->
-	enacl_nif:crypto_box_BEFORENMBYTES().
+	enacl_p_nif:crypto_box_BEFORENMBYTES().
 
 %% Signatures
 
 %% @private
 sign_keypair_public_size() ->
-    enacl_nif:crypto_sign_PUBLICKEYBYTES().
+    enacl_p_nif:crypto_sign_PUBLICKEYBYTES().
 
 %% @private
 sign_keypair_secret_size() ->
-    enacl_nif:crypto_sign_SECRETKEYBYTES().
+    enacl_p_nif:crypto_sign_SECRETKEYBYTES().
 
 %% @doc sign_keypair/0 returns a signature keypair for signing
 %%
@@ -349,7 +349,7 @@ sign_keypair_secret_size() ->
 %% @end
 -spec sign_keypair() -> #{ atom() => binary() }.
 sign_keypair() ->
-    {PK, SK} = enacl_nif:crypto_sign_keypair(),
+    {PK, SK} = enacl_p_nif:crypto_sign_keypair(),
     #{ public => PK, secret => SK}.
 
 %% @doc sign/2 signs a message with a digital signature identified by a secret key.
@@ -362,7 +362,7 @@ sign_keypair() ->
     SK :: binary(),
     SM :: binary().
 sign(M, SK) ->
-    enacl_nif:crypto_sign(M, SK).
+    enacl_p_nif:crypto_sign(M, SK).
 
 %% @doc sign_open/2 opens a digital signature
 %%
@@ -376,7 +376,7 @@ sign(M, SK) ->
     PK :: binary(),
     M :: binary().
 sign_open(SM, PK) ->
-   case enacl_nif:crypto_sign_open(SM, PK) of
+   case enacl_p_nif:crypto_sign_open(SM, PK) of
        M when is_binary(M) -> {ok, M};
        {error, Err} -> {error, Err}
     end.
@@ -391,7 +391,7 @@ sign_open(SM, PK) ->
     SK :: binary(),
     DS :: binary().
 sign_detached(M, SK) ->
-    enacl_nif:crypto_sign_detached(M, SK).
+    enacl_p_nif:crypto_sign_detached(M, SK).
 
 %% @doc sign_verify_detached/3 verifies the given signature against the given
 %% message for the given public key.
@@ -404,7 +404,7 @@ sign_detached(M, SK) ->
     M   :: iodata(),
     PK  :: binary().
 sign_verify_detached(SIG, M, PK) ->
-    case enacl_nif:crypto_sign_verify_detached(SIG, M, PK) of
+    case enacl_p_nif:crypto_sign_verify_detached(SIG, M, PK) of
         true -> {ok, M};
         false -> {error, failed_verification}
     end.
@@ -412,12 +412,12 @@ sign_verify_detached(SIG, M, PK) ->
 %% @private
 -spec box_secret_key_bytes() -> pos_integer().
 box_secret_key_bytes() ->
-	enacl_nif:crypto_box_SECRETKEYBYTES().
+	enacl_p_nif:crypto_box_SECRETKEYBYTES().
 
 %% @doc seal_box/2 encrypts an anonymous message to another party.
 %%
 %% Encrypt a `Msg' to a party using his public key, `PK'. This generates an ephemeral
-%% keypair and then uses `box'. Ephemeral public key will sent to other party. Returns the 
+%% keypair and then uses `box'. Ephemeral public key will sent to other party. Returns the
 %% enciphered message `SealedCipherText' which includes ephemeral public key at head.
 %% @end
 -spec box_seal(Msg, PK) -> SealedCipherText
@@ -425,8 +425,8 @@ box_secret_key_bytes() ->
        PK :: binary(),
        SealedCipherText :: binary().
 box_seal(Msg, PK) ->
-    enacl_nif:crypto_box_seal(Msg, PK).
- 
+    enacl_p_nif:crypto_box_seal(Msg, PK).
+
 %% @doc seal_box_open/3 decrypts+check message integrity from an unknown sender.
 %%
 %% Decrypt a `SealedCipherText' which contains an ephemeral public key from another party
@@ -439,7 +439,7 @@ box_seal(Msg, PK) ->
       SK :: binary(),
       Msg :: binary().
 box_seal_open(SealedCipherText, PK, SK) ->
-    case enacl_nif:crypto_box_seal_open(SealedCipherText, PK, SK) of
+    case enacl_p_nif:crypto_box_seal_open(SealedCipherText, PK, SK) of
         {error, Err} -> {error, Err};
         Bin when is_binary(Bin) -> {ok, Bin}
     end.
@@ -454,12 +454,12 @@ box_seal_open(SealedCipherText, PK, SK) ->
 secretbox(xsalsa20poly1305, Msg, Nonce, Key) ->
     case iolist_size(Msg) of
         K when K =< ?SECRETBOX_SIZE ->
-            bump(enacl_nif:crypto_secretbox_xsalsa20poly1305_b([?S_ZEROBYTES, Msg], Nonce, Key),
+            bump(enacl_p_nif:crypto_secretbox_xsalsa20poly1305_b([?S_ZEROBYTES, Msg], Nonce, Key),
                 ?SECRETBOX_REDUCTIONS,
                 ?SECRETBOX_SIZE,
                 K);
         _ ->
-            enacl_nif:crypto_secretbox_xsalsa20poly1305([?S_ZEROBYTES, Msg], Nonce, Key)
+            enacl_p_nif:crypto_secretbox_xsalsa20poly1305([?S_ZEROBYTES, Msg], Nonce, Key)
     end.
 
 %% @doc secretbox/3 encrypts a message with a key
@@ -477,12 +477,12 @@ secretbox(xsalsa20poly1305, Msg, Nonce, Key) ->
 secretbox(Msg, Nonce, Key) ->
     case iolist_size(Msg) of
         K when K =< ?SECRETBOX_SIZE ->
-          bump(enacl_nif:crypto_secretbox_b([?S_ZEROBYTES, Msg], Nonce, Key),
+          bump(enacl_p_nif:crypto_secretbox_b([?S_ZEROBYTES, Msg], Nonce, Key),
                ?SECRETBOX_REDUCTIONS,
                ?SECRETBOX_SIZE,
                K);
         _ ->
-          enacl_nif:crypto_secretbox([?S_ZEROBYTES, Msg], Nonce, Key)
+          enacl_p_nif:crypto_secretbox([?S_ZEROBYTES, Msg], Nonce, Key)
     end.
 
 -spec secretbox_open(xsalsa20poly1305, CipherText, Nonce, Key) -> {ok, Msg} | {error, failed_verification}
@@ -494,14 +494,14 @@ secretbox(Msg, Nonce, Key) ->
 secretbox_open(xsalsa20poly1305, CipherText, Nonce, Key) ->
     case iolist_size(CipherText) of
         K when K =< ?SECRETBOX_SIZE ->
-            R = case enacl_nif:crypto_secretbox_open_b([?S_BOXZEROBYTES, CipherText],
+            R = case enacl_p_nif:crypto_secretbox_open_b([?S_BOXZEROBYTES, CipherText],
                 Nonce, Key) of
                     {error, Err} -> {error, Err};
                     Bin when is_binary(Bin) -> {ok, Bin}
                 end,
             bump(R, ?SECRETBOX_OPEN_REDUCTIONS, ?SECRETBOX_SIZE, K);
         _ ->
-            case enacl_nif:crypto_secretbox_open([?S_BOXZEROBYTES, CipherText], Nonce, Key) of
+            case enacl_p_nif:crypto_secretbox_open([?S_BOXZEROBYTES, CipherText], Nonce, Key) of
                 {error, Err} -> {error, Err};
                 Bin when is_binary(Bin) -> {ok, Bin}
             end
@@ -520,38 +520,38 @@ secretbox_open(xsalsa20poly1305, CipherText, Nonce, Key) ->
 secretbox_open(CipherText, Nonce, Key) ->
     case iolist_size(CipherText) of
         K when K =< ?SECRETBOX_SIZE ->
-          R = case enacl_nif:crypto_secretbox_open_b([?S_BOXZEROBYTES, CipherText],
+          R = case enacl_p_nif:crypto_secretbox_open_b([?S_BOXZEROBYTES, CipherText],
                                                      Nonce, Key) of
                   {error, Err} -> {error, Err};
                   Bin when is_binary(Bin) -> {ok, Bin}
               end,
           bump(R, ?SECRETBOX_OPEN_REDUCTIONS, ?SECRETBOX_SIZE, K);
         _ ->
-          case enacl_nif:crypto_secretbox_open([?S_BOXZEROBYTES, CipherText], Nonce, Key) of
+          case enacl_p_nif:crypto_secretbox_open([?S_BOXZEROBYTES, CipherText], Nonce, Key) of
               {error, Err} -> {error, Err};
               Bin when is_binary(Bin) -> {ok, Bin}
           end
    end.
 
 secretbox_nonce_size(xsalsa20poly1305) ->
-    enacl_nif:crypto_secretbox_xsalsa20poly1305_NONCEBYTES().
+    enacl_p_nif:crypto_secretbox_xsalsa20poly1305_NONCEBYTES().
 
 %% @doc secretbox_nonce_size/0 returns the size of the secretbox nonce
 %%
 %% When encrypting with a secretbox, the nonce must have this size
 %% @end
 secretbox_nonce_size() ->
-    enacl_nif:crypto_secretbox_NONCEBYTES().
+    enacl_p_nif:crypto_secretbox_NONCEBYTES().
 
 secretbox_key_size(xsalsa20poly1305) ->
-    enacl_nif:crypto_secretbox_xsalsa20poly1305_KEYBYTES().
+    enacl_p_nif:crypto_secretbox_xsalsa20poly1305_KEYBYTES().
 
 %% @doc secretbox_key_size/0 returns the size of the secretbox key
 %%
 %% When encrypting with a secretbox, the key must have this size
 %% @end
 secretbox_key_size() ->
-    enacl_nif:crypto_secretbox_KEYBYTES().
+    enacl_p_nif:crypto_secretbox_KEYBYTES().
 
 %% @doc stream_nonce_size/0 returns the byte size of the nonce for streams
 %% @end
@@ -578,12 +578,12 @@ stream_key_size() -> ?CRYPTO_STREAM_KEYBYTES.
     Key :: binary(),
     CryptoStream :: binary().
 stream(Len, Nonce, Key) when is_integer(Len), Len >= 0, Len =< ?STREAM_SIZE ->
-    bump(enacl_nif:crypto_stream_b(Len, Nonce, Key),
+    bump(enacl_p_nif:crypto_stream_b(Len, Nonce, Key),
          ?STREAM_REDUCTIONS,
          ?STREAM_SIZE,
          Len);
 stream(Len, Nonce, Key) when is_integer(Len), Len >= 0 ->
-    enacl_nif:crypto_stream(Len, Nonce, Key);
+    enacl_p_nif:crypto_stream(Len, Nonce, Key);
 stream(_, _, _) -> error(badarg).
 
 %% @doc stream_xor/3 encrypts a plaintext message into ciphertext
@@ -600,29 +600,29 @@ stream(_, _, _) -> error(badarg).
 stream_xor(Msg, Nonce, Key) ->
     case iolist_size(Msg) of
       K when K =< ?STREAM_SIZE ->
-        bump(enacl_nif:crypto_stream_xor_b(Msg, Nonce, Key),
+        bump(enacl_p_nif:crypto_stream_xor_b(Msg, Nonce, Key),
              ?STREAM_REDUCTIONS,
              ?STREAM_SIZE,
              K);
       _ ->
-        enacl_nif:crypto_stream_xor(Msg, Nonce, Key)
+        enacl_p_nif:crypto_stream_xor(Msg, Nonce, Key)
     end.
 
 -spec auth_key_size(hmacsha256) -> pos_integer().
-auth_key_size(hmacsha256) -> enacl_nif:crypto_auth_hmacsha256_KEYBYTES().
+auth_key_size(hmacsha256) -> enacl_p_nif:crypto_auth_hmacsha256_KEYBYTES().
 
 %% @doc auth_key_size/0 returns the byte-size of the authentication key
 %% @end
 -spec auth_key_size() -> pos_integer().
-auth_key_size() -> enacl_nif:crypto_auth_KEYBYTES().
+auth_key_size() -> enacl_p_nif:crypto_auth_KEYBYTES().
 
 -spec auth_size(hmacsha256) -> pos_integer().
-auth_size(hmacsha256) -> enacl_nif:crypto_auth_hmacsha256_BYTES().
+auth_size(hmacsha256) -> enacl_p_nif:crypto_auth_hmacsha256_BYTES().
 
 %% @doc auth_size/0 returns the byte-size of the authenticator
 %% @end
 -spec auth_size() -> pos_integer().
-auth_size() -> enacl_nif:crypto_auth_BYTES().
+auth_size() -> enacl_p_nif:crypto_auth_BYTES().
 
 -spec auth(hmacsha256, Msg, Key) -> Authenticator
     when
@@ -632,9 +632,9 @@ auth_size() -> enacl_nif:crypto_auth_BYTES().
 auth(hmacsha256, Msg, Key) ->
     case iolist_size(Msg) of
         K when K =< ?AUTH_SIZE ->
-            bump(enacl_nif:crypto_auth_hmacsha256_b(Msg, Key), ?AUTH_REDUCTIONS, ?AUTH_SIZE, K);
+            bump(enacl_p_nif:crypto_auth_hmacsha256_b(Msg, Key), ?AUTH_REDUCTIONS, ?AUTH_SIZE, K);
         _ ->
-            enacl_nif:crypto_auth_hmacsha256(Msg, Key)
+            enacl_p_nif:crypto_auth_hmacsha256(Msg, Key)
     end.
 
 %% @doc auth/2 produces an authenticator (MAC) for a message
@@ -650,9 +650,9 @@ auth(hmacsha256, Msg, Key) ->
 auth(Msg, Key) ->
   case iolist_size(Msg) of
     K when K =< ?AUTH_SIZE ->
-      bump(enacl_nif:crypto_auth_b(Msg, Key), ?AUTH_REDUCTIONS, ?AUTH_SIZE, K);
+      bump(enacl_p_nif:crypto_auth_b(Msg, Key), ?AUTH_REDUCTIONS, ?AUTH_SIZE, K);
     _ ->
-      enacl_nif:crypto_auth(Msg, Key)
+      enacl_p_nif:crypto_auth(Msg, Key)
   end.
 
 -spec auth_verify(hmacsha256, Authenticator, Msg, Key) -> boolean()
@@ -663,12 +663,12 @@ auth(Msg, Key) ->
 auth_verify(hmacsha256, A, M, K) ->
     case iolist_size(M) of
         K when K =< ?AUTH_SIZE ->
-            bump(enacl_nif:crypto_auth_hmacsha256_verify_b(A, M, K),
+            bump(enacl_p_nif:crypto_auth_hmacsha256_verify_b(A, M, K),
                 ?AUTH_REDUCTIONS,
                 ?AUTH_SIZE,
                 K);
         _ ->
-            enacl_nif:crypto_auth_hmacsha256_verify(A, M, K)
+            enacl_p_nif:crypto_auth_hmacsha256_verify(A, M, K)
     end.
 
 %% @doc auth_verify/3 verifies an authenticator for a message
@@ -684,12 +684,12 @@ auth_verify(hmacsha256, A, M, K) ->
 auth_verify(A, M, K) ->
     case iolist_size(M) of
       K when K =< ?AUTH_SIZE ->
-        bump(enacl_nif:crypto_auth_verify_b(A, M, K),
+        bump(enacl_p_nif:crypto_auth_verify_b(A, M, K),
              ?AUTH_REDUCTIONS,
              ?AUTH_SIZE,
              K);
       _ ->
-        enacl_nif:crypto_auth_verify(A, M, K)
+        enacl_p_nif:crypto_auth_verify(A, M, K)
     end.
 
 %% @doc onetime_auth/2 produces a ONE-TIME authenticator for a message
@@ -705,12 +705,12 @@ auth_verify(A, M, K) ->
 onetime_auth(Msg, Key) ->
     case iolist_size(Msg) of
       K when K =< ?ONETIME_AUTH_SIZE ->
-        bump(enacl_nif:crypto_onetimeauth_b(Msg, Key),
+        bump(enacl_p_nif:crypto_onetimeauth_b(Msg, Key),
              ?ONETIME_AUTH_REDUCTIONS,
              ?ONETIME_AUTH_SIZE,
              K);
       _ ->
-        enacl_nif:crypto_onetimeauth(Msg, Key)
+        enacl_p_nif:crypto_onetimeauth(Msg, Key)
     end.
 
 %% @doc onetime_auth_verify/3 verifies an ONE-TIME authenticator for a message
@@ -727,23 +727,23 @@ onetime_auth(Msg, Key) ->
 onetime_auth_verify(A, M, K) ->
     case iolist_size(M) of
       K when K =< ?ONETIME_AUTH_SIZE ->
-        bump(enacl_nif:crypto_onetimeauth_verify_b(A, M, K),
+        bump(enacl_p_nif:crypto_onetimeauth_verify_b(A, M, K),
              ?ONETIME_AUTH_REDUCTIONS,
              ?ONETIME_AUTH_SIZE,
              K);
       _ ->
-        enacl_nif:crypto_onetimeauth_verify(A, M, K)
+        enacl_p_nif:crypto_onetimeauth_verify(A, M, K)
     end.
 
 %% @doc onetime_auth_size/0 returns the number of bytes of the one-time authenticator
 %% @end
 -spec onetime_auth_size() -> pos_integer().
-onetime_auth_size() -> enacl_nif:crypto_onetimeauth_BYTES().
+onetime_auth_size() -> enacl_p_nif:crypto_onetimeauth_BYTES().
 
 %% @doc onetime_auth_key_size/0 returns the byte-size of the onetime authentication key
 %% @end
 -spec onetime_auth_key_size() -> pos_integer().
-onetime_auth_key_size() -> enacl_nif:crypto_onetimeauth_KEYBYTES().
+onetime_auth_key_size() -> enacl_p_nif:crypto_onetimeauth_KEYBYTES().
 
 %% Curve 25519 Crypto
 %% ------------------
@@ -751,7 +751,7 @@ onetime_auth_key_size() -> enacl_nif:crypto_onetimeauth_KEYBYTES().
 %% @end.
 -spec curve25519_scalarmult(Secret :: binary(), BasePoint :: binary()) -> binary().
 curve25519_scalarmult(Secret, BasePoint) ->
-	enacl_nif:crypto_curve25519_scalarmult(Secret, BasePoint).
+	enacl_p_nif:crypto_curve25519_scalarmult(Secret, BasePoint).
 
 %% @doc curve25519_scalarmult/1 avoids messing up arguments.
 %% Takes as input a map `#{ secret := Secret, base_point := BasePoint }' in order to avoid
@@ -769,7 +769,7 @@ curve25519_scalarmult(#{ secret := Secret, base_point := BasePoint }) ->
 %% @end
 -spec crypto_sign_ed25519_keypair() -> #{ atom() => binary() }.
 crypto_sign_ed25519_keypair() ->
-	{PK, SK} = enacl_nif:crypto_sign_ed25519_keypair(),
+	{PK, SK} = enacl_p_nif:crypto_sign_ed25519_keypair(),
 	#{ public => PK, secret => SK }.
 
 %% @doc crypto_sign_ed25519_public_to_curve25519/1 converts a given Ed 25519 public
@@ -777,7 +777,7 @@ crypto_sign_ed25519_keypair() ->
 %% @end
 -spec crypto_sign_ed25519_public_to_curve25519(PublicKey :: binary()) -> binary().
 crypto_sign_ed25519_public_to_curve25519(PublicKey) ->
-	R = enacl_nif:crypto_sign_ed25519_public_to_curve25519(PublicKey),
+	R = enacl_p_nif:crypto_sign_ed25519_public_to_curve25519(PublicKey),
 	erlang:bump_reductions(?ED25519_PUBLIC_TO_CURVE_REDS),
 	R.
 
@@ -786,17 +786,17 @@ crypto_sign_ed25519_public_to_curve25519(PublicKey) ->
 %% @end
 -spec crypto_sign_ed25519_secret_to_curve25519(SecretKey :: binary()) -> binary().
 crypto_sign_ed25519_secret_to_curve25519(SecretKey) ->
-	R = enacl_nif:crypto_sign_ed25519_secret_to_curve25519(SecretKey),
+	R = enacl_p_nif:crypto_sign_ed25519_secret_to_curve25519(SecretKey),
 	erlang:bump_reductions(?ED25519_SECRET_TO_CURVE_REDS),
 	R.
 
 -spec crypto_sign_ed25519_public_size() -> pos_integer().
 crypto_sign_ed25519_public_size() ->
-	enacl_nif:crypto_sign_ed25519_PUBLICKEYBYTES().
+	enacl_p_nif:crypto_sign_ed25519_PUBLICKEYBYTES().
 
 -spec crypto_sign_ed25519_secret_size() -> pos_integer().
 crypto_sign_ed25519_secret_size() ->
-	enacl_nif:crypto_sign_ed25519_SECRETKEYBYTES().
+	enacl_p_nif:crypto_sign_ed25519_SECRETKEYBYTES().
 
 %% Obtaining random bytes
 
@@ -814,7 +814,7 @@ crypto_sign_ed25519_secret_size() ->
 %% @end
 -spec randombytes(non_neg_integer()) -> binary().
 randombytes(N) ->
-    enacl_nif:randombytes(N).
+    enacl_p_nif:randombytes(N).
 
 %% Helpers
 

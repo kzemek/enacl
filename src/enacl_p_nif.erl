@@ -1,7 +1,7 @@
 %%% @doc module enacl_nif provides the low-level interface to the NaCl/Sodium NIFs.
 %%% @end
 %%% @private
--module(enacl_nif).
+-module(enacl_p_nif).
 
 %% Public key auth
 -export([
@@ -131,7 +131,7 @@
 
 init() ->
 	SoName = filename:join(
-		case code:priv_dir(enacl) of
+		case code:priv_dir(enacl_p) of
 		    {error, bad_name} ->
 		        filename:join(filename:dirname(filename:dirname(code:which(?MODULE))), "priv");
 		    Dir ->

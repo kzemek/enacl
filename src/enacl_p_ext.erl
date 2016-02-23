@@ -3,7 +3,7 @@
 %%% Functions may be removed without further notice if it suddenly ends up being
 %%% better to do something differently than the solution given here.
 %%% </p>
--module(enacl_ext).
+-module(enacl_p_ext).
 
 -export([
 	scramble_block_16/2
@@ -29,7 +29,7 @@
 %% @end
 -spec scramble_block_16(binary(), binary()) -> binary().
 scramble_block_16(Block, Key) ->
-    enacl_nif:scramble_block_16(Block, Key).
+    enacl_p_nif:scramble_block_16(Block, Key).
 
 %% Curve 25519 Crypto
 %% ------------------
@@ -40,7 +40,7 @@ scramble_block_16(Block, Key) ->
 %% @end
 -spec curve25519_keypair() -> #{ atom() => binary() }.
 curve25519_keypair() ->
-	<<B0:8/integer, B1:30/binary, B2:8/integer>> = enacl:randombytes(32),
+	<<B0:8/integer, B1:30/binary, B2:8/integer>> = enacl_p:randombytes(32),
 	SK = <<(B0 band 248), B1/binary, (64 bor (B2 band 127))>>,
 	PK = curve25519_public_key(SK),
 	#{ public => PK, secret => SK }.
@@ -49,10 +49,10 @@ curve25519_keypair() ->
 %% @end
 -spec curve25519_public_key(SecretKey :: binary()) -> binary().
 curve25519_public_key(SecretKey) ->
-	enacl:curve25519_scalarmult(SecretKey, <<9, 0:248>>).
+	enacl_p:curve25519_scalarmult(SecretKey, <<9, 0:248>>).
 
 %% @doc curve25519_shared/2 creates a new shared secret from a given SecretKey and PublicKey.
 %% @end.
 -spec curve25519_shared(SecretKey :: binary(), PublicKey :: binary()) -> binary().
 curve25519_shared(SecretKey, PublicKey) ->
-	enacl:curve25519_scalarmult(SecretKey, PublicKey).
+	enacl_p:curve25519_scalarmult(SecretKey, PublicKey).
